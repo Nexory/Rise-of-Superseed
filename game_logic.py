@@ -2,7 +2,6 @@ import pygame
 import random
 from levels import Level
 from buildings import Base
-from ui import UI
 from units import Player_ArcherUnit, Bandit_King, Bandit_Razor, CartUnit
 from factions import Player, Bandits, Undead, Zombies
 
@@ -41,7 +40,6 @@ class Tower:
             self.sprite = pygame.image.load(sprite_path).convert_alpha()
             self.sprite = pygame.transform.scale(self.sprite, (base_width, base_height))
         except Exception as e:
-            print(f"Failed to load tower sprite {sprite_path}: {e}")
             self.sprite = pygame.Surface((base_width, base_height))
             self.sprite.fill((0, 0, 255))
 
@@ -59,7 +57,6 @@ class Wall:
             new_height = int(orig_height * 0.75)
             self.sprite = pygame.transform.scale(self.sprite, (new_width, new_height))
         except Exception as e:
-            print(f"Failed to load wall sprite {sprite_path}: {e}")
             self.sprite = pygame.Surface((75, 225))
             self.sprite.fill((150, 150, 150))
 
@@ -107,22 +104,25 @@ class Game:
         self.selected_unit = None
 
         self.static_surface = pygame.Surface((1920, 1040)).convert()
-        battlefield = pygame.image.load("assets/backgrounds/battlefield.png").convert()
-        orig_height = battlefield.get_height()
-        crop_height = int(orig_height * 0.95)
-        battlefield = battlefield.subsurface((0, 0, battlefield.get_width(), crop_height))
-        self.static_surface.blit(pygame.transform.scale(battlefield, (1920, 880)), (0, 0))
+        try:
+            battlefield = pygame.image.load("assets/backgrounds/battlefield.png").convert()
+            orig_height = battlefield.get_height()
+            crop_height = int(orig_height * 0.95)
+            battlefield = battlefield.subsurface((0, 0, battlefield.get_width(), crop_height))
+            self.static_surface.blit(pygame.transform.scale(battlefield, (1920, 880)), (0, 0))
+        except Exception as e:
+            self.static_surface.fill((0, 100, 0))
         pygame.draw.rect(self.static_surface, (14, 39, 59), (0, 880, 1920, 160))
 
-        self.player_wall_back = Wall(0, 880-225, "C:/Pygame/EvolutionWar/assets/buildings/Player/Skin 1/player_wall_back.png")
+        self.player_wall_back = Wall(0, 880-225, "assets/buildings/Player/Skin 1/player_wall_back.png")
         self.player_base = Base(x=125, y=880-300, health=Base.base_health,
                                sprite_path="assets/buildings/Player/Skin 1/player_base.png", is_player=True)
-        self.player_wall = Wall(-50, 880-225, "C:/Pygame/EvolutionWar/assets/buildings/Player/Skin 1/player_wall.png")
+        self.player_wall = Wall(-50, 880-225, "assets/buildings/Player/Skin 1/player_wall.png")
         self.player_tower = None
         self.enemy_base = Base(x=1920-250, y=880-300, health=1000,
                               sprite_path="assets/buildings/Enemy/Zombies/enemy_base.png", is_player=False)
 
-        self.ui = UI(self, 1920)
+        # self.ui = UI(self, 1920)
         self.last_enemy_spawn = pygame.time.get_ticks()
         self.game_over = False
         self.won = False
@@ -152,9 +152,8 @@ class Game:
         self.scale_factor = 1.0
         
         try:
-            self.menu_button_bg = pygame.image.load("C:/Pygame/EvolutionWar/assets/ui/ui_buttons.png").convert_alpha()
+            self.menu_button_bg = pygame.image.load("assets/ui/ui_buttons.png").convert_alpha()
         except Exception as e:
-            print(f"Failed to load ui_buttons.png for menu button: {e}")
             self.menu_button_bg = pygame.Surface((60, 40))
             self.menu_button_bg.fill((147, 208, 207))
 
@@ -193,12 +192,10 @@ class Game:
             
             self.units.append(new_unit)
             self.main_menu.achievements.check_achievements("unit_spawned", {"unit": new_unit})
-            print(f"Spawned {unit_type.__name__}: Health={new_unit.max_health:.1f}, Damage={new_unit.attack_power:.1f}, Speed={new_unit.speed:.1f}, Attack Cooldown={new_unit.attack_cooldown}")
             return new_unit
 
     def spawn_enemy_unit(self):
         if self.enemy_spawns_stopped:
-            print("Enemy spawn blocked after base destroyed or king spawned")
             return
         unit_type = self.level.get_next_enemy_unit()
         if not unit_type:
@@ -215,7 +212,6 @@ class Game:
         new_unit.attack_power *= faction.attack_mod
         new_unit.speed *= faction.speed_mod
         self.enemy_units.append(new_unit)
-        print(f"Spawned enemy {unit_type.__name__}: Health={new_unit.max_health:.1f}, Damage={new_unit.attack_power:.1f}, Speed={new_unit.speed:.1f}")
 
     def spawn_bandit_king(self):
         self.bandit_king = Bandit_King(self.enemy_faction, 1920 - 250)
@@ -225,17 +221,13 @@ class Game:
         self.king_moving = True
         self.enemy_spawns_stopped = True
         self.surrender_triggered = False
-        print(f"Bandit King spawned at x={self.bandit_king.x}")
 
     def spawn_cart_and_razor(self):
         razor_unit = Bandit_Razor(self.enemy_faction, 1920 - 100)
         razor_unit.speed = 1.5
         self.enemy_units.append(razor_unit)
-        print(f"Spawned Bandit Razor at x={razor_unit.x} with speed={razor_unit.speed}")
-
         target_x = self.bandit_king.x - 50
         self.cart = CartUnit(2000, 880 - 150, target_x)
-        print(f"Spawned Cart at x={self.cart.x} with speed={self.cart.speed}")
 
     def apply_upgrade(self, unit, upgrade_type):
         unit_name = unit.__class__.__name__.replace("Player_", "").replace("Unit", "")
@@ -324,29 +316,20 @@ class Game:
         if self.is_paused_by_event():
             return True
 
-        if self.bandit_king:
-            print(f"Bandit King status - state: {self.bandit_king.state}, "
-                  f"health: {self.bandit_king.health}/{self.bandit_king.max_health}, "
-                  f"x: {self.bandit_king.x}, in enemy_units: {self.bandit_king in self.enemy_units}")
-
         if self.cart and self.cart.moving:
             razor_unit = next((unit for unit in self.enemy_units if isinstance(unit, Bandit_Razor)), None)
             if razor_unit and self.bandit_king:
                 razor_dist = abs(razor_unit.x - self.bandit_king.x)
                 cart_dist = abs(self.cart.x - self.cart.target_x)
-                print(f"Cart x={self.cart.x}, target_x={self.cart.target_x}, dist={cart_dist}, "
-                      f"Razor x={razor_unit.x}, King x={self.bandit_king.x}, dist={razor_dist}")
                 if razor_dist < 150 and cart_dist < 20:
                     self.cart.x = self.cart.target_x
                     self.cart.moving = False
                     self.show_surrender_part_two = True
-                    print("Cart stopped and surrender part two triggered")
             self.cart.update()
 
         if self.bandit_king and not self.surrender_triggered:
             if (self.bandit_king.health <= self.bandit_king.max_health * 0.1 and 
                 self.main_menu.max_level <= 5):
-                print("Surrender triggered: Bandit King at 10% health")
                 self.show_bandit_surrender = True
                 self.surrender_triggered = True
                 self.arrows = []
@@ -357,7 +340,6 @@ class Game:
                         unit.state = "idle"
                         unit.is_attacking = False
                         unit.attack_target = None
-                        print(f"Unit {unit.name} set to idle")
 
         self.event_handler.handle_units_moving_back()
         self.event_handler.handle_king_moving()
@@ -389,8 +371,6 @@ class Game:
         self.units[:] = [unit for unit in self.units if not (unit.state == "die" and unit.frame >= len(unit.animations["die"]) - 1)]
 
         for enemy in self.enemy_units[:]:
-            if enemy == self.bandit_king:
-                print(f"Updating Bandit King: state={enemy.state}, x={enemy.x}")
             if -192 <= enemy.x <= 1920:
                 if (self.cart and (self.cart.moving or self.show_surrender_part_two) or self.king_moving) and not isinstance(enemy, Bandit_Razor):
                     enemy.state = "idle"
@@ -415,7 +395,6 @@ class Game:
         dead_enemies = [enemy for enemy in self.enemy_units if enemy.state == "die" and enemy.frame >= len(enemy.animations["die"]) - 1]
         for enemy in dead_enemies:
             if enemy == self.bandit_king:
-                print("Bandit King being removed from enemy_units due to death")
                 self.bandit_king = None
                 if self.level.level_number == 5:
                     self.handle_level_completion()
@@ -452,7 +431,6 @@ class Game:
                     enemy.frame = 0
                 self.enemy_units = []
                 self.enemy_spawns_stopped = True
-                print("Enemy base destroyed, spawning Bandit King")
                 self.spawn_bandit_king()
             elif self.level.level_number != 5:
                 for enemy in self.enemy_units:
@@ -465,19 +443,11 @@ class Game:
         return True
 
     def toggle_fullscreen(self):
-        current_flags = self.screen.get_flags()
-        if current_flags & pygame.FULLSCREEN:
-            self.screen = pygame.display.set_mode((1920, 1080))
-            self.scale_factor = 1.0
-            self.static_surface = pygame.transform.scale(self.static_surface, (1920, 1040))
-        else:
-            screen_info = pygame.display.Info()
-            self.screen = pygame.display.set_mode((screen_info.current_w, screen_info.current_h), pygame.FULLSCREEN)
-            self.scale_factor = screen_info.current_w / 1920
-            self.static_surface = pygame.transform.smoothscale(self.static_surface, (int(1920 * self.scale_factor), int(1040 * self.scale_factor)))
-        self.ui.scale(self.scale_factor)
-        self.level_up_button = pygame.Rect(int(1920 // 2 - 100 * self.scale_factor), int(140 * self.scale_factor), int(200 * self.scale_factor), int(40 * self.scale_factor))
-        self.menu_button = pygame.Rect(int((1920 - 180) * self.scale_factor), int(20 * self.scale_factor), int(60 * self.scale_factor), int(40 * self.scale_factor))
+        try:
+            import js
+            js.toggleFullscreen()
+        except Exception as e:
+            pass
 
     def handle_level_completion(self):
         self.main_menu.achievements.check_achievements("level_complete", {"level": self.level.level_number})
@@ -496,72 +466,29 @@ class Game:
             self.game_over = True
             self.won = True
 
-    def run(self):
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                    self.main_menu.save_player_data()
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    mouse_x, mouse_y = event.pos
-                    self.event_handler.handle_events(event)
-                    if self.game_over and self.fade_alpha >= 255 and self.return_button.collidepoint(mouse_x, mouse_y):
-                        running = False
-                        self.main_menu.active = True
-                        self.main_menu.show_levels = False
-                    elif self.menu_button.collidepoint(mouse_x, mouse_y) and not self.game_over:
-                        self.menu_open = not self.menu_open
-                    elif self.menu_open:
-                        if self.show_options_submenu:
-                            for option, rect in self.options_submenu_buttons.items():
-                                if rect.collidepoint(mouse_x, mouse_y):
-                                    if option == "Toggle Fullscreen":
-                                        self.toggle_fullscreen()
-                                    elif option == "Back":
-                                        self.show_options_submenu = False
-                        else:
-                            for option, rect in self.menu_options.items():
-                                if rect.collidepoint(mouse_x, mouse_y):
-                                    if option == "Options":
-                                        self.show_options_submenu = True
-                                    elif option == "Back to Menu":
-                                        running = False
-                                        self.main_menu.active = True
-                                        self.main_menu.show_levels = False
-                                    elif option == "Exit Game":
-                                        pygame.quit()
-                                        exit()
-                    elif self.level_up_available and self.level_up_button.collidepoint(mouse_x, mouse_y):
-                        self.xp -= self.max_xp
-                        self.max_xp *= 1.5
-                        self.level_up_available = False
-                        if not self.player_tower:
-                            base_width, base_height = self.player_base.sprite.get_size()
-                            self.player_tower = Tower(0, 880-300, "C:/Pygame/EvolutionWar/assets/buildings/Player/Skin 1/player_tower.png", base_width, base_height)
-                    elif not self.game_over and not self.units_moving_back and not self.king_moving:
-                        for unit in self.units:
-                            if unit.get_rect().collidepoint(mouse_x, mouse_y):
-                                self.selected_unit = unit
-                                print(f"Selected {unit.name} at x={unit.x}")
-                                break
-                        else:
-                            result = self.ui.handle_event(event)
-                            if result:
-                                self.spawn_unit(result)
-                            if self.main_menu.active:
-                                upgrade = self.main_menu.handle_event(event)
-                                if upgrade and self.selected_unit:
-                                    self.apply_upgrade(self.selected_unit, upgrade)
-
-            if not self.update():
-                running = False
-                self.main_menu.active = True
-                self.main_menu.show_levels = False
-            
-            self.draw(self.screen)
+    # In game_logic.py, replace run method with:
+    async def run(self):
+        self.screen.fill((255, 255, 0))
+        pygame.display.flip()
+        try:
+            import js
+            canvas = js.document.getElementById("canvas")
+            ctx = canvas.getContext("2d")
+            ctx.drawImage(pygame.display.get_surface().canvas, 0, 0)
+        except Exception:
+            pass
+        while self.running:
+            self.screen.fill((0, 255, 0))
             pygame.display.flip()
+            try:
+                import js
+                canvas = js.document.getElementById("canvas")
+                ctx = canvas.getContext("2d")
+                ctx.drawImage(pygame.display.get_surface().canvas, 0, 0)
+            except Exception:
+                pass
             self.clock.tick(60)
+            await asyncio.sleep(0.016)
 
     def draw(self, screen):
         screen.blit(self.static_surface, (0, 0))
@@ -585,12 +512,10 @@ class Game:
         
         self.ui.draw(screen)
 
-        # Use TrueType fonts with increased size for clarity
         try:
-            FONT_CTA = pygame.font.Font("C:/Pygame/EvolutionWar/assets/fonts/OpenSans-Bold.ttf", 28)  # Increased from 24
-            FONT_BODY = pygame.font.Font("C:/Pygame/EvolutionWar/assets/fonts/OpenSans-Regular.ttf", 24)  # Increased from 20
+            FONT_CTA = pygame.font.Font("assets/fonts/OpenSans-Bold.ttf", 28)
+            FONT_BODY = pygame.font.Font("assets/fonts/OpenSans-Regular.ttf", 24)
         except Exception as e:
-            print(f"Failed to load fonts in Game: {e}")
             FONT_CTA = pygame.font.SysFont("Open Sans", 28, bold=True)
             FONT_BODY = pygame.font.SysFont("Open Sans", 24)
         

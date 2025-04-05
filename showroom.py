@@ -1,53 +1,55 @@
-# showroom.py (Version 1.2)
+# showroom.py
 import pygame
-import os
 
 class Showroom:
     def __init__(self, screen, clock):
         self.screen = screen
         self.clock = clock
         self.active = True
-        self.sprite_data = {}  # {name: {"frames": [], "frame": 0, "last_update": 0}}
+        self.sprite_data = {}
         self.load_sprites()
         self.back_button = pygame.Rect(1920 - 200, 1080 - 100, 150, 50)
         self.scroll_y = 0
         self.max_scroll = max(0, (len(self.sprite_data) // 5 + 1) * 200 - 1080)
-        self.frame_delay = 100  # Match Unit frame delay
+        self.frame_delay = 100
 
     def load_sprites(self):
-        base_path = "assets/sprites/"
-        for root, _, files in os.walk(base_path):
-            for file in files:
-                if file.endswith(".png"):
-                    path = os.path.join(root, file)
-                    try:
-                        spritesheet = pygame.image.load(path).convert_alpha()
-                        frame_width = 192
-                        frame_height = 192
-                        frames_per_state = 14  # Match Unit assumption
-                        if spritesheet.get_width() >= frame_width and spritesheet.get_height() >= frame_height:
-                            idle_frames = []
-                            for i in range(frames_per_state):
-                                x = i * frame_width
-                                if x + frame_width <= spritesheet.get_width():
-                                    frame = spritesheet.subsurface((x, 0, frame_width, frame_height))
-                                    frame = pygame.transform.scale(frame, (192, 192))
-                                    idle_frames.append(frame)
-                                else:
-                                    break
-                            if idle_frames:  # Only add if frames exist
-                                name = os.path.splitext(file)[0]
-                                faction = os.path.basename(root)
-                                full_name = f"{faction}/{name}"
-                                self.sprite_data[full_name] = {
-                                    "frames": idle_frames,
-                                    "frame": 0,
-                                    "last_update": pygame.time.get_ticks()
-                                }
+        # Hardcode sprite paths since os.walk isn't available in browser
+        sprite_paths = [
+            "assets/sprites/Player/Player_Peasant.png",
+            "assets/sprites/Player/Player_Archer.png",
+            "assets/sprites/Player/Player_Warrior.png",
+            "assets/sprites/Player/Player_Tank.png",
+            "assets/sprites/Bandits/Bandit_Razor.png",
+            # Add more as needed
+        ]
+        for path in sprite_paths:
+            try:
+                spritesheet = pygame.image.load(path).convert_alpha()
+                frame_width = 192
+                frame_height = 192
+                frames_per_state = 14
+                if spritesheet.get_width() >= frame_width and spritesheet.get_height() >= frame_height:
+                    idle_frames = []
+                    for i in range(frames_per_state):
+                        x = i * frame_width
+                        if x + frame_width <= spritesheet.get_width():
+                            frame = spritesheet.subsurface((x, 0, frame_width, frame_height))
+                            frame = pygame.transform.scale(frame, (192, 192))
+                            idle_frames.append(frame)
                         else:
-                            print(f"Skipping {path}: too small for frame size {frame_width}x{frame_height}")
-                    except Exception as e:
-                        print(f"Failed to load {path}: {e}")
+                            break
+                    if idle_frames:
+                        name = path.split('/')[-1].replace('.png', '')
+                        faction = path.split('/')[-2]
+                        full_name = f"{faction}/{name}"
+                        self.sprite_data[full_name] = {
+                            "frames": idle_frames,
+                            "frame": 0,
+                            "last_update": pygame.time.get_ticks()
+                        }
+            except Exception as e:
+                print(f"Failed to load {path}: {e}")
 
     def update_animations(self):
         now = pygame.time.get_ticks()
@@ -66,7 +68,7 @@ class Showroom:
         return None
 
     def draw(self, screen):
-        screen.fill((14, 39, 59))  # Background color
+        screen.fill((14, 39, 59))
         FONT_BODY = pygame.font.SysFont("Open Sans", 24)
 
         for i, (name, data) in enumerate(self.sprite_data.items()):

@@ -1,4 +1,3 @@
-# factions.py
 class Faction:
     def __init__(self, name, health_mod, attack_mod, speed_mod):
         self.name = name

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Evolution War</title>
+    <link rel="icon" href="data:,">
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #000;
+        color: white;
+      }
+      canvas {
+        width: 1920px;
+        height: 1080px;
+        max-width: 100%;
+        max-height: 100vh;
+        object-fit: contain;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas width="1920" height="1080"></canvas>
+    <audio id="menu-music" loop>
+      <source src="assets/sounds/Menu.ogg" type="audio/ogg">
+      Your browser does not support the audio element.
+    </audio>
+    <script type="module" src="/main.js"></script>
+    <script>
+      window.addEventListener('load', function() {
+        // Audio handling
+        var audio = document.getElementById('menu-music');
+        audio.volume = 0.5;
+        var playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(function() {
+            console.log("Background music started automatically.");
+          }).catch(function(error) {
+            console.log("Autoplay prevented, waiting for user interaction:", error);
+            document.body.addEventListener('click', function startAudio() {
+              audio.play().then(function() {
+                console.log("Background music started after user click.");
+              }).catch(function(e) {
+                console.log("Error playing audio after click:", e);
+              });
+              document.body.removeEventListener('click', startAudio);
+            }, { once: true });
+          });
+        });
+
+        // Fullscreen toggle
+        function toggleFullscreen() {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+          } else if (document.exitFullscreen) {
+            document.exitFullscreen();
+          }
+        }
+
+        // Expose fullscreen function to Python (if needed)
+        window.toggleFullscreen = toggleFullscreen;
+
+        // LocalStorage for save/load
+        function savePlayerData(data) {
+          localStorage.setItem('evolution_war_data', JSON.stringify(data));
+        }
+        function loadPlayerData() {
+          return JSON.parse(localStorage.getItem('evolution_war_data') || '{}');
+        }
+        window.savePlayerData = savePlayerData;
+        window.loadPlayerData = loadPlayerData;
+      });
+    </script>
+  </body>
+</html>

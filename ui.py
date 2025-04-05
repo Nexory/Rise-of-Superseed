@@ -7,13 +7,12 @@ class Button:
         self.text = text
         self.ui = ui_instance
         try:
-            base_image = pygame.image.load("C:/Pygame/EvolutionWar/assets/ui/ui_buybuttons.png").convert_alpha()
-            base_image = pygame.transform.scale(base_image, (width, height))  # Scaled to 180x180px
+            base_image = pygame.image.load("assets/ui/ui_buybuttons.png").convert_alpha()
+            base_image = pygame.transform.scale(base_image, (width, height))
             self.normal = base_image
             self.greyed = pygame.transform.scale(base_image.copy(), (width, height))
             self.greyed.fill((100, 100, 100, 150), special_flags=pygame.BLEND_RGBA_SUB)
-        except Exception as e:
-            print(f"Failed to load ui_buybuttons.png: {e}")
+        except Exception:
             self.normal = pygame.Surface((width, height), pygame.SRCALPHA)
             self.greyed = pygame.Surface((width, height), pygame.SRCALPHA)
         self.font = pygame.font.SysFont("Arial", 24)
@@ -21,10 +20,9 @@ class Button:
         self.hovered = False
         self.clicked = False
         try:
-            self.click_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/UI/button_click.wav")
-            self.back_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/UI/button_back.wav")
-        except Exception as e:
-            print(f"Failed to load button sounds: {e}")
+            self.click_sound = pygame.mixer.Sound("assets/sounds/UI/button_click.wav")
+            self.back_sound = pygame.mixer.Sound("assets/sounds/UI/button_back.wav")
+        except Exception:
             self.click_sound = None
             self.back_sound = None
 
@@ -61,16 +59,14 @@ class UI:
         self.last_seeds = None
         self.seeds_text_surface = None
         self.unit_icons = {}
-        self.last_debug_time = 0  # Timer for slowing down debug prints
         try:
-            self.background = pygame.image.load("C:/Pygame/EvolutionWar/assets/ui/ui_background.png").convert_alpha()
+            self.background = pygame.image.load("assets/ui/ui_background.png").convert_alpha()
             bg_height = self.screen_height - 880
             self.background = pygame.transform.scale(self.background, (self.screen_width, bg_height))
-            self.background_overlay = pygame.image.load("C:/Pygame/EvolutionWar/assets/ui/ui_background_overlay.png").convert_alpha()
+            self.background_overlay = pygame.image.load("assets/ui/ui_background_overlay.png").convert_alpha()
             overlay_height = bg_height
             self.background_overlay = pygame.transform.scale(self.background_overlay, (self.screen_width, overlay_height))
-        except Exception as e:
-            print(f"Failed to load UI background images: {e}")
+        except Exception:
             self.background = pygame.Surface((self.screen_width, self.screen_height - 880))
             self.background.fill((14, 39, 59))
             self.background_overlay = pygame.Surface((self.screen_width, self.screen_height - 880))
@@ -93,9 +89,12 @@ class UI:
 
     def preload_icons(self):
         for unit_type in self.unit_types:
-            unit = unit_type(self.game.player_faction, 0)
-            icon = unit.get_icon()
-            self.unit_icons[unit_type] = pygame.transform.smoothscale(icon, (150, 150))
+            try:
+                unit = unit_type(self.game.player_faction, 0)
+                icon = unit.get_icon()
+                self.unit_icons[unit_type] = pygame.transform.smoothscale(icon, (150, 150))
+            except Exception:
+                self.unit_icons[unit_type] = pygame.Surface((150, 150))  # Fallback icon
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -121,9 +120,6 @@ class UI:
         if self.seeds_text_surface:
             screen.blit(self.seeds_text_surface, (10, 10))
 
-        current_time = pygame.time.get_ticks()
-        debug_interval = 1000  # 1 second in milliseconds
-
         for button, unit_type in self.buy_buttons:
             seeds = self.game.seeds
             cost = unit_type.cost
@@ -139,26 +135,12 @@ class UI:
                     pygame.draw.rect(alpha_mask, (255, 255, 255, 255), (0, 0, fill_width, button.rect.height))
                 button_image.blit(alpha_mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-            # No pressed effect applied here; clicking only plays sound
-
-            # Sample center pixel for RGBA and get surface alpha
-            center_x, center_y = button.rect.width // 2, button.rect.height // 2
-            rgba = button_image.get_at((center_x, center_y))
-            alpha = button_image.get_alpha() if button_image.get_alpha() is not None else 255
-
-            # Debug print, limited to once per second
-            if current_time - self.last_debug_time >= debug_interval:
-                print(f"Button: {button.text}, Seeds: {seeds}, Cost: {cost}, Fill Ratio: {fill_ratio}, Clicked: {button.clicked}, Opacity: {alpha}, RGBA: {rgba}")
-
             button.draw(screen, button_image)
 
             icon = self.unit_icons[unit_type]
             icon_x = button.rect.x + (button.rect.width - icon.get_width()) // 2
             icon_y = button.rect.y - 10
             screen.blit(icon, (icon_x, icon_y))
-
-        if current_time - self.last_debug_time >= debug_interval:
-            self.last_debug_time = current_time
 
     def scale(self, scale_factor):
         pass

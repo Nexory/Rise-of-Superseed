@@ -6,11 +6,10 @@ class EventHandler:
         self.game = game
         self.okay_button = pygame.Rect(0, 0, 250, 80)
         try:
-            self.click_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/UI/button_click.wav")
-            self.text_bg = pygame.image.load("C:/Pygame/EvolutionWar/assets/ui/ui_text.png").convert_alpha()
-            self.button_bg = pygame.image.load("C:/Pygame/EvolutionWar/assets/ui/ui_buttons.png").convert_alpha()
-        except Exception as e:
-            print(f"Failed to load assets in EventHandler: {e}")
+            self.click_sound = pygame.mixer.Sound("assets/sounds/UI/button_click.wav")
+            self.text_bg = pygame.image.load("assets/ui/ui_text.png").convert_alpha()
+            self.button_bg = pygame.image.load("assets/ui/ui_buttons.png").convert_alpha()
+        except Exception:
             self.click_sound = None
             self.text_bg = pygame.Surface((100, 30))
             self.text_bg.fill((50, 50, 50))
@@ -28,28 +27,23 @@ class EventHandler:
                 elif self.game.show_end_story:
                     self.game.show_end_story = False
                     self.game.handle_level_completion()
-                    print("End story acknowledged, completing level")
                 elif self.game.show_bandit_intro:
                     self.game.show_bandit_intro = False
                 elif self.game.show_king_threat:
                     self.game.show_king_threat = False
-                    print("King's threat acknowledged")
                 elif self.game.show_surrender_part_two:
                     self.game.show_surrender_part_two = False
                     self.game.show_end_story = True
-                    print("Surrender part two acknowledged, showing end story")
 
     def update(self):
         if self.game.show_bandit_surrender:
             razor_unit = next((unit for unit in self.game.enemy_units if isinstance(unit, Bandit_Razor)), None)
             if self.game.cart and razor_unit and self.game.bandit_king:
                 razor_dist = abs(razor_unit.x - self.game.bandit_king.x)
-                print(f"Razor dist: {razor_dist}")
                 if razor_dist < 180:
                     self.game.cart.moving = False
                     self.game.show_bandit_surrender = False
                     self.game.show_surrender_part_two = True
-                    print("Surrender part two triggered")
 
     def handle_units_moving_back(self):
         if self.game.units_moving_back:
@@ -96,15 +90,13 @@ class EventHandler:
         return False
 
     def draw(self, screen):
-        # Use TrueType fonts with increased size for clarity
         try:
-            FONT_CTA = pygame.font.Font("C:/Pygame/EvolutionWar/assets/fonts/OpenSans-Bold.ttf", 40)
-            FONT_BODY = pygame.font.Font("C:/Pygame/EvolutionWar/assets/fonts/OpenSans-Regular.ttf", 32)
-        except Exception as e:
-            print(f"Failed to load fonts in EventHandler: {e}")
+            FONT_CTA = pygame.font.Font("assets/fonts/OpenSans-Bold.ttf", 40)
+            FONT_BODY = pygame.font.Font("assets/fonts/OpenSans-Regular.ttf", 32)
+        except Exception:
             FONT_CTA = pygame.font.SysFont("Open Sans", 40, bold=True)
             FONT_BODY = pygame.font.SysFont("Open Sans", 32)
-        PADDING = 40  # Increased from 35 to 40
+        PADDING = 40
 
         if self.game.show_intro:
             overlay = pygame.Surface((1920, 1040))
@@ -150,9 +142,12 @@ class EventHandler:
             screen.blit(bg, (bg_x, bg_y))
             for i, surface in enumerate(text_surfaces):
                 screen.blit(surface, (bg_x + PADDING + (max_width - 2 * PADDING - surface.get_width()) // 2, bg_y + PADDING + i * surface.get_height()))
-            archer = Player_ArcherUnit("Player", 0)
-            archer_icon = pygame.transform.scale(archer.animations["idle"][0], (192, 192))
-            screen.blit(archer_icon, (bg_x + (max_width - 192) // 2, bg_y + PADDING + sum(surface.get_height() for surface in text_surfaces)))
+            try:
+                archer = Player_ArcherUnit("Player", 0)
+                archer_icon = pygame.transform.scale(archer.animations["idle"][0], (192, 192))
+                screen.blit(archer_icon, (bg_x + (max_width - 192) // 2, bg_y + PADDING + sum(surface.get_height() for surface in text_surfaces)))
+            except Exception:
+                pass  # Skip icon if it fails
             screen.blit(unlock_text, (bg_x + PADDING + (max_width - 2 * PADDING - unlock_text.get_width()) // 2, bg_y + PADDING + sum(surface.get_height() for surface in text_surfaces) + 192 + 20))
             self.okay_button.topleft = (1920 // 2 - 125, bg_y + total_height + 20)
             bg_button = pygame.transform.scale(self.button_bg, (self.okay_button.width, self.okay_button.height))

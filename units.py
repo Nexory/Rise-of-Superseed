@@ -1,6 +1,5 @@
 import pygame
 import math
-import os
 import random
 from factions import Player, Bandits, Undead, Zombies
 from collisions import check_player_collisions, check_enemy_collisions
@@ -48,11 +47,11 @@ class Unit:
         # Sound initialization
         self.attack_sound = None
         self.death_sound = None
-        self.is_zombie = False  # Flag for zombie units
+        self.is_zombie = False
         try:
-            self.attack_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/melee_sword.wav")
-        except Exception as e:
-            print(f"Failed to load default melee_sword.wav: {e}")
+            self.attack_sound = pygame.mixer.Sound("assets/sounds/Units/melee_sword.ogg")
+        except Exception:
+            self.attack_sound = None
         self.load_animations()
 
     def load_animations(self):
@@ -64,13 +63,6 @@ class Unit:
             self.set_default_animations()
             return
         
-        if not os.path.exists(spritesheet_path):
-            if spritesheet_path not in Unit.missing_spritesheets:
-                print(f"Error: Spritesheet not found at {spritesheet_path}")
-                Unit.missing_spritesheets.add(spritesheet_path)
-            self.set_default_animations()
-            return
-
         try:
             spritesheet = pygame.image.load(spritesheet_path).convert_alpha()
             frame_width = 192
@@ -91,10 +83,8 @@ class Unit:
                         frames.append(frame)
                 self.animations[state] = frames if frames else [pygame.Surface((int(192 * self.scale_factor), int(192 * self.scale_factor)))]
             self.animations["hurt"] = [pygame.transform.smoothscale(self.animations["die"][0], (int(192 * self.scale_factor), int(192 * self.scale_factor)))] if self.animations["die"] else [pygame.Surface((int(192 * self.scale_factor), int(192 * self.scale_factor)))]
-        except Exception as e:
-            if spritesheet_path not in Unit.missing_spritesheets:
-                print(f"Failed to load spritesheet {spritesheet_path}: {e}")
-                Unit.missing_spritesheets.add(spritesheet_path)
+        except Exception:
+            Unit.missing_spritesheets.add(spritesheet_path)
             self.set_default_animations()
 
     def set_default_animations(self):
@@ -126,7 +116,6 @@ class Unit:
         self.last_update = now
 
         if self.state not in self.animations or not self.animations[self.state]:
-            print(f"{self.name} resetting to idle: no valid animation for state {self.state}")
             self.state = "idle"
             self.frame = 0
             return None
@@ -134,19 +123,13 @@ class Unit:
         max_frame = len(self.animations[self.state]) - 1
         
         if self.state == "attack":
-            print(f"{self.name} attack frame {self.frame}, target: {self.attack_target.name if hasattr(self.attack_target, 'name') else 'base' if self.attack_target else 'None'}, is_attacking: {self.is_attacking}")
             self.frame += 1
             if self.frame == 7 and self.is_attacking and self.attack_target:
-                if hasattr(self.attack_target, 'state'):
+                if hasattr(self.attack_target, 'state') and self.attack_target.state != "die":
                     self.attack_target.take_damage(self.attack_power)
-                    print(f"{self.name} dealt {self.attack_power} damage to {self.attack_target.name}, target state: {self.attack_target.state}")
                 elif hasattr(self.attack_target, 'health') and self.attack_target.health > 0:
                     self.attack_target.take_damage(self.attack_power)
-                    print(f"{self.name} dealt {self.attack_power} damage to base")
-                else:
-                    print(f"{self.name} no valid target at frame 7")
             if self.frame > max_frame:
-                print(f"{self.name} attack animation complete")
                 self.is_attacking = False
                 self.attack_target = None
                 self.state = "idle"
@@ -201,7 +184,6 @@ class Unit:
             self.last_attack = now
             if self.attack_sound:
                 self.attack_sound.play()
-            print(f"{self.name} started attacking {target.name if hasattr(target, 'name') else 'base'}")
 
     def take_damage(self, damage):
         if self.state == "die":
@@ -214,15 +196,15 @@ class Unit:
             self.hurt_start = None
             self.is_attacking = False
             self.attack_target = None
+            if self.is_zombie and self.death_sound:
+                self.death_sound.play()
         elif self.state != "attack":
             self.state = "hurt"
             self.frame = 0
             self.hurt_start = pygame.time.get_ticks()
 
     def die(self):
-        if self.is_zombie and self.death_sound:
-            self.death_sound.play()
-        # Death logic already handled in take_damage setting state to "die"
+        pass  # Death sound moved to take_damage
 
     def draw(self, screen):
         if self.state in self.animations and self.animations[self.state]:
@@ -259,10 +241,9 @@ class Player_PeasantUnit(Unit):
     def __init__(self, faction, x):
         super().__init__(faction, x)
         try:
-            self.attack_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/melee_fist.wav")
-        except Exception as e:
-            print(f"Failed to load melee_fist.wav: {e}")
-            self.attack_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/melee_sword.wav")
+            self.attack_sound = pygame.mixer.Sound("assets/sounds/Units/melee_fist.ogg")
+        except Exception:
+            self.attack_sound = None
 
 class Player_ArcherUnit(Unit):
     name = "Player_Archer"
@@ -281,7 +262,6 @@ class Player_ArcherUnit(Unit):
         self.last_update = now
 
         if self.state not in self.animations or not self.animations[self.state]:
-            print(f"{self.name} resetting to idle: no valid animation for state {self.state}")
             self.state = "idle"
             self.frame = 0
             return None
@@ -289,21 +269,15 @@ class Player_ArcherUnit(Unit):
         max_frame = len(self.animations[self.state]) - 1
         
         if self.state == "attack":
-            print(f"{self.name} attack frame {self.frame}, target: {self.attack_target.name if hasattr(self.attack_target, 'name') else 'base' if self.attack_target else 'None'}, is_attacking: {self.is_attacking}")
             self.frame += 1
             if self.frame == 7 and self.is_attacking and self.attack_target:
                 arrow_start_x = self.x + int(115 * self.scale_factor)
                 arrow_start_y = self.y + int(105 * self.scale_factor)
-                if hasattr(self.attack_target, 'state'):
-                    print(f"{self.name} firing arrow at unit {self.attack_target.name}, state: {self.attack_target.state}")
+                if hasattr(self.attack_target, 'state') and self.attack_target.state != "die":
                     return Arrow(arrow_start_x, arrow_start_y, self.direction, self.attack_target, self.attack_power)
                 elif hasattr(self.attack_target, 'health') and self.attack_target.health > 0:
-                    print(f"{self.name} fired arrow at base")
                     return Arrow(arrow_start_x, arrow_start_y, self.direction, self.attack_target, self.attack_power)
-                else:
-                    print(f"{self.name} no valid target at frame 7")
             if self.frame > max_frame:
-                print(f"{self.name} attack animation complete")
                 self.is_attacking = False
                 self.attack_target = None
                 self.state = "idle"
@@ -376,7 +350,6 @@ class Bandit_Archer(Unit):
         self.last_update = now
 
         if self.state not in self.animations or not self.animations[self.state]:
-            print(f"{self.name} resetting to idle: no valid animation for state {self.state}")
             self.state = "idle"
             self.frame = 0
             return None
@@ -384,21 +357,15 @@ class Bandit_Archer(Unit):
         max_frame = len(self.animations[self.state]) - 1
         
         if self.state == "attack":
-            print(f"{self.name} attack frame {self.frame}, target: {self.attack_target.name if hasattr(self.attack_target, 'name') else 'base' if self.attack_target else 'None'}, is_attacking: {self.is_attacking}")
             self.frame += 1
             if self.frame == 7 and self.is_attacking and self.attack_target:
                 arrow_start_x = self.x + int(77 * self.scale_factor)
                 arrow_start_y = self.y + int(105 * self.scale_factor)
-                if hasattr(self.attack_target, 'state'):
-                    print(f"{self.name} firing arrow at unit {self.attack_target.name}, state: {self.attack_target.state}")
+                if hasattr(self.attack_target, 'state') and self.attack_target.state != "die":
                     return Arrow(arrow_start_x, arrow_start_y, self.direction, self.attack_target, self.attack_power)
                 elif hasattr(self.attack_target, 'health') and self.attack_target.health > 0:
-                    print(f"{self.name} fired arrow at base")
                     return Arrow(arrow_start_x, arrow_start_y, self.direction, self.attack_target, self.attack_power)
-                else:
-                    print(f"{self.name} no valid target at frame 7")
             if self.frame > max_frame:
-                print(f"{self.name} attack animation complete")
                 self.is_attacking = False
                 self.attack_target = None
                 self.state = "idle"
@@ -448,13 +415,6 @@ class Bandit_King(Unit):
             self.set_default_animations()
             return
         
-        if not os.path.exists(spritesheet_path):
-            if spritesheet_path not in Unit.missing_spritesheets:
-                print(f"Error: Spritesheet not found at {spritesheet_path}")
-                Unit.missing_spritesheets.add(spritesheet_path)
-            self.set_default_animations()
-            return
-
         try:
             spritesheet = pygame.image.load(spritesheet_path).convert_alpha()
             frame_width = 192
@@ -473,10 +433,8 @@ class Bandit_King(Unit):
                         frames.append(frame)
                 self.animations[state] = frames if frames else [pygame.Surface((288, 288))]
             self.animations["hurt"] = [pygame.transform.smoothscale(self.animations["die"][0], (288, 288))] if self.animations["die"] else [pygame.Surface((288, 288))]
-        except Exception as e:
-            if spritesheet_path not in Unit.missing_spritesheets:
-                print(f"Failed to load spritesheet {spritesheet_path}: {e}")
-                Unit.missing_spritesheets.add(spritesheet_path)
+        except Exception:
+            Unit.missing_spritesheets.add(spritesheet_path)
             self.set_default_animations()
 
     def set_default_animations(self):
@@ -523,9 +481,9 @@ class Zombie_Melee(Unit):
         super().__init__(faction, x)
         self.is_zombie = True
         try:
-            self.death_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/zombie_die.wav")
-        except Exception as e:
-            print(f"Failed to load zombie_die.wav: {e}")
+            self.death_sound = pygame.mixer.Sound("assets/sounds/Units/Zombie_die.ogg")
+        except Exception:
+            self.death_sound = None
 
 class Zombie_Archer(Unit):
     name = "Zombie_Archer"
@@ -540,9 +498,9 @@ class Zombie_Archer(Unit):
         super().__init__(faction, x)
         self.is_zombie = True
         try:
-            self.death_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/zombie_die.wav")
-        except Exception as e:
-            print(f"Failed to load zombie_die.wav: {e}")
+            self.death_sound = pygame.mixer.Sound("assets/sounds/Units/Zombie_die.ogg")
+        except Exception:
+            self.death_sound = None
 
     def update_animation(self):
         now = pygame.time.get_ticks()
@@ -552,7 +510,6 @@ class Zombie_Archer(Unit):
         self.last_update = now
 
         if self.state not in self.animations or not self.animations[self.state]:
-            print(f"{self.name} resetting to idle: no valid animation for state {self.state}")
             self.state = "idle"
             self.frame = 0
             return None
@@ -560,21 +517,15 @@ class Zombie_Archer(Unit):
         max_frame = len(self.animations[self.state]) - 1
         
         if self.state == "attack":
-            print(f"{self.name} attack frame {self.frame}, target: {self.attack_target.name if hasattr(self.attack_target, 'name') else 'base' if self.attack_target else 'None'}, is_attacking: {self.is_attacking}")
             self.frame += 1
             if self.frame == 7 and self.is_attacking and self.attack_target:
                 arrow_start_x = self.x + int(77 * self.scale_factor)
                 arrow_start_y = self.y + int(105 * self.scale_factor)
-                if hasattr(self.attack_target, 'state'):
-                    print(f"{self.name} firing arrow at unit {self.attack_target.name}, state: {self.attack_target.state}")
+                if hasattr(self.attack_target, 'state') and self.attack_target.state != "die":
                     return Arrow(arrow_start_x, arrow_start_y, self.direction, self.attack_target, self.attack_power)
                 elif hasattr(self.attack_target, 'health') and self.attack_target.health > 0:
-                    print(f"{self.name} fired arrow at base")
                     return Arrow(arrow_start_x, arrow_start_y, self.direction, self.attack_target, self.attack_power)
-                else:
-                    print(f"{self.name} no valid target at frame 7")
             if self.frame > max_frame:
-                print(f"{self.name} attack animation complete")
                 self.is_attacking = False
                 self.attack_target = None
                 self.state = "idle"
@@ -606,9 +557,9 @@ class Zombie_Assassin(Unit):
         super().__init__(faction, x)
         self.is_zombie = True
         try:
-            self.death_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/zombie_die.wav")
-        except Exception as e:
-            print(f"Failed to load zombie_die.wav: {e}")
+            self.death_sound = pygame.mixer.Sound("assets/sounds/Units/Zombie_die.ogg")
+        except Exception:
+            self.death_sound = None
 
 class Zombie_Farmer(Unit):
     name = "Zombie_Farmer"
@@ -623,9 +574,9 @@ class Zombie_Farmer(Unit):
         super().__init__(faction, x)
         self.is_zombie = True
         try:
-            self.death_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/zombie_die.wav")
-        except Exception as e:
-            print(f"Failed to load zombie_die.wav: {e}")
+            self.death_sound = pygame.mixer.Sound("assets/sounds/Units/Zombie_die.ogg")
+        except Exception:
+            self.death_sound = None
 
 class Zombie_Tank(Unit):
     name = "Zombie_Tank"
@@ -640,9 +591,9 @@ class Zombie_Tank(Unit):
         super().__init__(faction, x)
         self.is_zombie = True
         try:
-            self.death_sound = pygame.mixer.Sound("C:/Pygame/EvolutionWar/assets/sounds/Units/zombie_die.wav")
-        except Exception as e:
-            print(f"Failed to load zombie_die.wav: {e}")
+            self.death_sound = pygame.mixer.Sound("assets/sounds/Units/Zombie_die.ogg")
+        except Exception:
+            self.death_sound = None
 
 # Undead Units
 class Undead_Axeman(Unit):
@@ -680,7 +631,6 @@ class Undead_Mage(Unit):
         self.last_update = now
 
         if self.state not in self.animations or not self.animations[self.state]:
-            print(f"{self.name} resetting to idle: no valid animation for state {self.state}")
             self.state = "idle"
             self.frame = 0
             return None
@@ -688,21 +638,15 @@ class Undead_Mage(Unit):
         max_frame = len(self.animations[self.state]) - 1
         
         if self.state == "attack":
-            print(f"{self.name} attack frame {self.frame}, target: {self.attack_target.name if hasattr(self.attack_target, 'name') else 'base' if self.attack_target else 'None'}, is_attacking: {self.is_attacking}")
             self.frame += 1
             if self.frame == 7 and self.is_attacking and self.attack_target:
                 magicball_start_x = self.x + int(77 * self.scale_factor)
                 magicball_start_y = self.y + int(105 * self.scale_factor)
-                if hasattr(self.attack_target, 'state'):
-                    print(f"{self.name} firing magic ball at unit {self.attack_target.name}, state: {self.attack_target.state}")
+                if hasattr(self.attack_target, 'state') and self.attack_target.state != "die":
                     return MagicBall(magicball_start_x, magicball_start_y, self.direction, self.attack_target, self.attack_power)
                 elif hasattr(self.attack_target, 'health') and self.attack_target.health > 0:
-                    print(f"{self.name} fired magic ball at base")
                     return MagicBall(magicball_start_x, magicball_start_y, self.direction, self.attack_target, self.attack_power)
-                else:
-                    print(f"{self.name} no valid target at frame 7")
             if self.frame > max_frame:
-                print(f"{self.name} attack animation complete")
                 self.is_attacking = False
                 self.attack_target = None
                 self.state = "idle"
@@ -749,10 +693,9 @@ class CartUnit:
         self.speed = -1.5
         self.moving = True
         try:
-            self.sprite = pygame.image.load("C:/Pygame/EvolutionWar/assets/images/Cart.png").convert_alpha()
+            self.sprite = pygame.image.load("assets/images/Cart.png").convert_alpha()
             self.sprite = pygame.transform.scale(self.sprite, (150, 150))
-        except Exception as e:
-            print(f"Failed to load Cart.png: {e}")
+        except Exception:
             self.sprite = pygame.Surface((150, 150))
             self.sprite.fill((139, 69, 19))
 
@@ -792,8 +735,7 @@ class Arrow:
         try:
             self.sprite = pygame.image.load("assets/images/arrow.png").convert_alpha()
             self.sprite = pygame.transform.scale(self.sprite, (32, 16))
-        except Exception as e:
-            print(f"Failed to load arrow sprite: {e}")
+        except Exception:
             self.sprite = pygame.Surface((32, 16))
             self.sprite.fill((255, 255, 255))
 
@@ -828,7 +770,6 @@ class Arrow:
                 if (hasattr(self.target, 'state') and self.target.state != "die") or \
                    (hasattr(self.target, 'health') and self.target.health > 0):
                     self.target.take_damage(self.damage)
-                    print(f"Arrow hit {self.target.name if hasattr(self.target, 'name') else 'base'} for {self.damage} damage")
                 self.active = False
                 return True
         return False
@@ -883,8 +824,7 @@ class MagicBall:
         try:
             self.sprite = pygame.image.load("assets/images/magicball.png").convert_alpha()
             self.sprite = pygame.transform.scale(self.sprite, (32, 32))
-        except Exception as e:
-            print(f"Failed to load magicball sprite: {e}")
+        except Exception:
             self.sprite = pygame.Surface((32, 32))
             self.sprite.fill((128, 0, 128))
 

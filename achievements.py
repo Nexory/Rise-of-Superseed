@@ -1,4 +1,3 @@
-# achievements.py
 import pygame
 import json
 
@@ -39,24 +38,27 @@ class Achievements:
 
     def load_achievements(self):
         try:
-            with open("achievements.json", "r") as f:
-                data = json.load(f)
-                if not isinstance(data, dict) or not data:
-                    print("Empty or invalid achievements.json detected. Using default achievements.")
-                    return
-                for key in self.achievements:
-                    if key in data:
-                        if isinstance(data[key], dict) and "unlocked" in data[key]:
-                            self.achievements[key]["unlocked"] = data[key]["unlocked"]
-                        elif isinstance(data[key], bool):
-                            self.achievements[key]["unlocked"] = data[key]
-        except (FileNotFoundError, json.JSONDecodeError):
-            print("No valid achievements.json found. Using default achievements.")
+            import js  # Pygbag provides this for JavaScript interop
+            data = js.loadPlayerData()
+            if not data or not isinstance(data, dict):
+                print("Empty or invalid achievements data from localStorage")
+                return
+            for key in self.achievements:
+                if key in data:
+                    if isinstance(data[key], dict) and "unlocked" in data[key]:
+                        self.achievements[key]["unlocked"] = data[key]["unlocked"]
+                    elif isinstance(data[key], bool):
+                        self.achievements[key]["unlocked"] = data[key]
+        except Exception as e:
+            print(f"Failed to load achievements from localStorage: {e}")
 
     def save_achievements(self):
         data = {key: {"unlocked": value["unlocked"]} for key, value in self.achievements.items()}
-        with open("achievements.json", "w") as f:
-            json.dump(data, f)
+        try:
+            import js
+            js.savePlayerData(data)
+        except Exception as e:
+            print(f"Failed to save achievements to localStorage: {e}")
 
     def unlock_achievement(self, achievement):
         if achievement in self.achievements and not self.achievements[achievement]["unlocked"]:
@@ -130,7 +132,7 @@ class Achievements:
             if self.popup_queue:
                 achievement = self.popup_queue[0]
                 text = f"Achievement Unlocked: {achievement}"
-                font = pygame.font.SysFont("Open Sans", 36, bold=True)
+                font = pygame.font.SysFont("Arial", 36, bold=True)
                 text_surface = font.render(text, True, (255, 255, 255))
                 screen_width, screen_height = screen.get_size()
                 popup_width = text_surface.get_width() + 40
@@ -141,8 +143,8 @@ class Achievements:
                 screen.blit(text_surface, (popup_x + 20, popup_y + 20))
 
     def draw_achievements_menu(self, screen):
-        screen.blit(pygame.Surface((1920, 1080)), (0, 0))  # Clear screen
-        font = pygame.font.SysFont("Open Sans", 24)
+        screen.blit(pygame.Surface((1920, 1080)), (0, 0))
+        font = pygame.font.SysFont("Arial", 24)
         y = 50
         for name, data in self.achievements.items():
             color = (0, 255, 0) if data["unlocked"] else (255, 0, 0)
