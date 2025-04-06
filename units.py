@@ -109,11 +109,13 @@ class Unit:
         return pygame.Rect(self.x, self.y, int(120 * self.scale_factor), int(192 * self.scale_factor))
 
     def update_animation(self):
+        js.console.log("Entering update_animation")
         now = pygame.time.get_ticks()
         frame_delay = self.attack_frame_delay if self.state == "attack" else self.base_frame_delay
         if now - self.last_update < frame_delay:
             return None
         self.last_update = now
+        js.console.log(f"State: {self.state}, Frame: {self.frame}")
 
         if self.state not in self.animations or not self.animations[self.state]:
             self.state = "idle"
@@ -146,7 +148,7 @@ class Unit:
             return None
         else:
             self.frame = (self.frame + 1) % (max_frame + 1)
-            return None
+            return None         
 
     def move(self, all_units, enemy_base, player_base, buckets, bucket_size):
         if self.state in ["attack", "die"]:

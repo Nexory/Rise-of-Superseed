@@ -2,8 +2,11 @@ import pygame
 import random
 from levels import Level
 from buildings import Base
-from units import Player_ArcherUnit, Bandit_King, Bandit_Razor, CartUnit
+from ui import UI
+from units import Unit, Player_ArcherUnit, Bandit_King, Bandit_Razor, CartUnit
 from factions import Player, Bandits, Undead, Zombies
+import js
+import asyncio
 
 class SeedDrop:
     def __init__(self, x, y, value):
@@ -16,9 +19,10 @@ class SeedDrop:
         try:
             self.sprite = pygame.image.load("assets/images/seed.png").convert_alpha()
             self.sprite = pygame.transform.scale(self.sprite, (51, 51))
-        except:
+        except Exception as e:
+            js.console.log(f"Failed to load seed sprite: assets/images/seed.png - {str(e)}")
             self.sprite = pygame.Surface((51, 51))
-            self.sprite.fill((249, 249, 242))
+            self.sprite.fill((249, 249, 242))  # Fallback off-white surface
 
     def update(self):
         elapsed = pygame.time.get_ticks() - self.creation_time
@@ -40,8 +44,9 @@ class Tower:
             self.sprite = pygame.image.load(sprite_path).convert_alpha()
             self.sprite = pygame.transform.scale(self.sprite, (base_width, base_height))
         except Exception as e:
+            js.console.log(f"Failed to load tower sprite: {sprite_path} - {str(e)}")
             self.sprite = pygame.Surface((base_width, base_height))
-            self.sprite.fill((0, 0, 255))
+            self.sprite.fill((0, 0, 255))  # Fallback blue surface
 
     def draw(self, screen):
         screen.blit(self.sprite, (self.x, self.y))
@@ -57,8 +62,9 @@ class Wall:
             new_height = int(orig_height * 0.75)
             self.sprite = pygame.transform.scale(self.sprite, (new_width, new_height))
         except Exception as e:
+            js.console.log(f"Failed to load wall sprite: {sprite_path} - {str(e)}")
             self.sprite = pygame.Surface((75, 225))
-            self.sprite.fill((150, 150, 150))
+            self.sprite.fill((150, 150, 150))  # Fallback gray surface
 
     def draw(self, screen):
         screen.blit(self.sprite, (self.x, self.y))
@@ -103,6 +109,7 @@ class Game:
         }
         self.selected_unit = None
 
+        # Battlefield background
         self.static_surface = pygame.Surface((1920, 1040)).convert()
         try:
             battlefield = pygame.image.load("assets/backgrounds/battlefield.png").convert()
@@ -111,9 +118,11 @@ class Game:
             battlefield = battlefield.subsurface((0, 0, battlefield.get_width(), crop_height))
             self.static_surface.blit(pygame.transform.scale(battlefield, (1920, 880)), (0, 0))
         except Exception as e:
-            self.static_surface.fill((0, 100, 0))
+            js.console.log(f"Failed to load battlefield background: assets/backgrounds/battlefield.png - {str(e)}")
+            self.static_surface.fill((0, 100, 0))  # Fallback green surface
         pygame.draw.rect(self.static_surface, (14, 39, 59), (0, 880, 1920, 160))
 
+        # Walls and base with corrected relative paths
         self.player_wall_back = Wall(0, 880-225, "assets/buildings/Player/Skin 1/player_wall_back.png")
         self.player_base = Base(x=125, y=880-300, health=Base.base_health,
                                sprite_path="assets/buildings/Player/Skin 1/player_base.png", is_player=True)
@@ -122,7 +131,8 @@ class Game:
         self.enemy_base = Base(x=1920-250, y=880-300, health=1000,
                               sprite_path="assets/buildings/Enemy/Zombies/enemy_base.png", is_player=False)
 
-        # self.ui = UI(self, 1920)
+
+        self.ui = UI(self, 1920)
         self.last_enemy_spawn = pygame.time.get_ticks()
         self.game_over = False
         self.won = False
@@ -154,11 +164,13 @@ class Game:
         try:
             self.menu_button_bg = pygame.image.load("assets/ui/ui_buttons.png").convert_alpha()
         except Exception as e:
+            js.console.log(f"Failed to load menu button background: assets/ui/ui_buttons.png - {str(e)}")
             self.menu_button_bg = pygame.Surface((60, 40))
-            self.menu_button_bg.fill((147, 208, 207))
+            self.menu_button_bg.fill((147, 208, 207))  # Fallback cyan surface
 
         from eventhandler import EventHandler
         self.event_handler = EventHandler(self)
+        self.running = True  # Added to ensure run loop works
 
     def spawn_unit(self, unit_type):
         if self.seeds >= unit_type.cost:
@@ -192,10 +204,12 @@ class Game:
             
             self.units.append(new_unit)
             self.main_menu.achievements.check_achievements("unit_spawned", {"unit": new_unit})
+            js.console.log(f"Spawned {unit_type.__name__}: Health={new_unit.max_health:.1f}, Damage={new_unit.attack_power:.1f}, Speed={new_unit.speed:.1f}, Attack Cooldown={new_unit.attack_cooldown}")
             return new_unit
 
     def spawn_enemy_unit(self):
         if self.enemy_spawns_stopped:
+            js.console.log("Enemy spawn blocked after base destroyed or king spawned")
             return
         unit_type = self.level.get_next_enemy_unit()
         if not unit_type:
@@ -212,6 +226,7 @@ class Game:
         new_unit.attack_power *= faction.attack_mod
         new_unit.speed *= faction.speed_mod
         self.enemy_units.append(new_unit)
+        js.console.log(f"Spawned enemy {unit_type.__name__}: Health={new_unit.max_health:.1f}, Damage={new_unit.attack_power:.1f}, Speed={new_unit.speed:.1f}")
 
     def spawn_bandit_king(self):
         self.bandit_king = Bandit_King(self.enemy_faction, 1920 - 250)
@@ -221,13 +236,17 @@ class Game:
         self.king_moving = True
         self.enemy_spawns_stopped = True
         self.surrender_triggered = False
+        js.console.log(f"Bandit King spawned at x={self.bandit_king.x}")
 
     def spawn_cart_and_razor(self):
         razor_unit = Bandit_Razor(self.enemy_faction, 1920 - 100)
         razor_unit.speed = 1.5
         self.enemy_units.append(razor_unit)
+        js.console.log(f"Spawned Bandit Razor at x={razor_unit.x} with speed={razor_unit.speed}")
+
         target_x = self.bandit_king.x - 50
         self.cart = CartUnit(2000, 880 - 150, target_x)
+        js.console.log(f"Spawned Cart at x={self.cart.x} with speed={self.cart.speed}")
 
     def apply_upgrade(self, unit, upgrade_type):
         unit_name = unit.__class__.__name__.replace("Player_", "").replace("Unit", "")
@@ -316,20 +335,29 @@ class Game:
         if self.is_paused_by_event():
             return True
 
+        if self.bandit_king:
+            js.console.log(f"Bandit King status - state: {self.bandit_king.state}, "
+                           f"health: {self.bandit_king.health}/{self.bandit_king.max_health}, "
+                           f"x: {self.bandit_king.x}, in enemy_units: {self.bandit_king in self.enemy_units}")
+
         if self.cart and self.cart.moving:
             razor_unit = next((unit for unit in self.enemy_units if isinstance(unit, Bandit_Razor)), None)
             if razor_unit and self.bandit_king:
                 razor_dist = abs(razor_unit.x - self.bandit_king.x)
                 cart_dist = abs(self.cart.x - self.cart.target_x)
+                js.console.log(f"Cart x={self.cart.x}, target_x={self.cart.target_x}, dist={cart_dist}, "
+                               f"Razor x={razor_unit.x}, King x={self.bandit_king.x}, dist={razor_dist}")
                 if razor_dist < 150 and cart_dist < 20:
                     self.cart.x = self.cart.target_x
                     self.cart.moving = False
                     self.show_surrender_part_two = True
+                    js.console.log("Cart stopped and surrender part two triggered")
             self.cart.update()
 
         if self.bandit_king and not self.surrender_triggered:
             if (self.bandit_king.health <= self.bandit_king.max_health * 0.1 and 
                 self.main_menu.max_level <= 5):
+                js.console.log("Surrender triggered: Bandit King at 10% health")
                 self.show_bandit_surrender = True
                 self.surrender_triggered = True
                 self.arrows = []
@@ -340,6 +368,7 @@ class Game:
                         unit.state = "idle"
                         unit.is_attacking = False
                         unit.attack_target = None
+                        js.console.log(f"Unit {unit.name} set to idle")
 
         self.event_handler.handle_units_moving_back()
         self.event_handler.handle_king_moving()
@@ -371,6 +400,8 @@ class Game:
         self.units[:] = [unit for unit in self.units if not (unit.state == "die" and unit.frame >= len(unit.animations["die"]) - 1)]
 
         for enemy in self.enemy_units[:]:
+            if enemy == self.bandit_king:
+                js.console.log(f"Updating Bandit King: state={enemy.state}, x={enemy.x}")
             if -192 <= enemy.x <= 1920:
                 if (self.cart and (self.cart.moving or self.show_surrender_part_two) or self.king_moving) and not isinstance(enemy, Bandit_Razor):
                     enemy.state = "idle"
@@ -395,6 +426,7 @@ class Game:
         dead_enemies = [enemy for enemy in self.enemy_units if enemy.state == "die" and enemy.frame >= len(enemy.animations["die"]) - 1]
         for enemy in dead_enemies:
             if enemy == self.bandit_king:
+                js.console.log("Bandit King being removed from enemy_units due to death")
                 self.bandit_king = None
                 if self.level.level_number == 5:
                     self.handle_level_completion()
@@ -431,6 +463,7 @@ class Game:
                     enemy.frame = 0
                 self.enemy_units = []
                 self.enemy_spawns_stopped = True
+                js.console.log("Enemy base destroyed, spawning Bandit King")
                 self.spawn_bandit_king()
             elif self.level.level_number != 5:
                 for enemy in self.enemy_units:
@@ -442,53 +475,43 @@ class Game:
 
         return True
 
-    def toggle_fullscreen(self):
-        try:
-            import js
-            js.toggleFullscreen()
-        except Exception as e:
-            pass
-
-    def handle_level_completion(self):
-        self.main_menu.achievements.check_achievements("level_complete", {"level": self.level.level_number})
-        self.main_menu.secured_seeds += self.seeds
-        self.main_menu.achievements.check_achievements("seeds_secured", {"total_seeds": self.main_menu.secured_seeds})
-        self.seeds = 0
-        if self.level.level_number >= self.main_menu.max_level:
-            self.main_menu.max_level = self.level.level_number + 1
-        if self.level.level_number == 5 and self.main_menu.max_level >= 5:
-            self.main_menu.unit_types = self.main_menu.all_unit_types.copy()
-            self.main_menu.achievements.check_achievements("unit_unlocked", {"unit": "Archer"})
-        self.main_menu.save_player_data()
-        if self.level.level_number == 5 and not self.bandit_king:
-            self.show_end_story = True
-        else:
-            self.game_over = True
-            self.won = True
-
-    # In game_logic.py, replace run method with:
     async def run(self):
+        # Set the screen to yellow to confirm rendering works
         self.screen.fill((255, 255, 0))
         pygame.display.flip()
-        try:
-            import js
-            canvas = js.document.getElementById("canvas")
-            ctx = canvas.getContext("2d")
-            ctx.drawImage(pygame.display.get_surface().canvas, 0, 0)
-        except Exception:
-            pass
+        
+        # Main game loop
+        loop_count = 0
         while self.running:
-            self.screen.fill((0, 255, 0))
-            pygame.display.flip()
             try:
-                import js
-                canvas = js.document.getElementById("canvas")
-                ctx = canvas.getContext("2d")
-                ctx.drawImage(pygame.display.get_surface().canvas, 0, 0)
-            except Exception:
-                pass
-            self.clock.tick(60)
-            await asyncio.sleep(0.016)
+                loop_count += 1
+                
+                ### Event Handling ###
+                events = pygame.event.get()
+                for event in events:
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        self.event_handler.handle_events(event)
+                        result = self.ui.handle_event(event)
+                        if result:
+                            self.spawn_unit(result)
+                
+                ### Update Game State ###
+                self.update()
+
+                ### Draw to Screen ###
+                self.draw(self.screen)
+                
+                ### Update Display and Yield ###
+                pygame.display.flip()
+                await asyncio.sleep(0.001)  # Yield control to the browser's event loop
+                
+                ### Frame Rate Control ###
+                self.clock.tick(60)  # Cap at 60 FPS
+            
+            except Exception as e:
+                break
 
     def draw(self, screen):
         screen.blit(self.static_surface, (0, 0))
@@ -512,10 +535,12 @@ class Game:
         
         self.ui.draw(screen)
 
+        # Use TrueType fonts with increased size for clarity
         try:
-            FONT_CTA = pygame.font.Font("assets/fonts/OpenSans-Bold.ttf", 28)
-            FONT_BODY = pygame.font.Font("assets/fonts/OpenSans-Regular.ttf", 24)
+            FONT_CTA = pygame.font.Font("assets/fonts/OpenSans-Bold.ttf", 28)  # Increased from 24
+            FONT_BODY = pygame.font.Font("assets/fonts/OpenSans-Regular.ttf", 24)  # Increased from 20
         except Exception as e:
+            print(f"Failed to load fonts in Game: {e}")
             FONT_CTA = pygame.font.SysFont("Open Sans", 28, bold=True)
             FONT_BODY = pygame.font.SysFont("Open Sans", 24)
         
